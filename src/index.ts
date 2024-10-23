@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Server, StableBTreeMap, ic } from 'azle';
 import express, { Request, Response, NextFunction } from 'express';
+import { body, validationResult } from 'express-validator';
 
 /**
  * `usersStorage` - a key-value data structure used to store user profiles.
@@ -132,9 +133,23 @@ app.post("/users/:id/skills", (req: Request, res: Response, next: NextFunction) 
 });
 
 /**
+ * Middleware for validating rating input
+ */
+const validateRatingInput = [
+    body('userId').isString().withMessage('User ID is required and must be a string.'),
+    body('score').isInt({ min: 1, max: 5 }).withMessage('Score must be an integer between 1 and 5.'),
+    body('comment').optional().isString().withMessage('Comment must be a string.')
+];
+
+/**
  * Verify a skill by rating it
  */
-app.post("/users/:userId/skills/:skillName/verify", (req: Request, res: Response, next: NextFunction) => {
+app.post("/users/:userId/skills/:skillName/verify", validateRatingInput, (req: Request, res: Response, next: NextFunction) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
     try {
         const userId = req.params.userId;
         const skillName = req.params.skillName;
@@ -144,13 +159,27 @@ app.post("/users/:userId/skills/:skillName/verify", (req: Request, res: Response
             return res.status(404).send(`User with id=${userId} not found`);
         }
 
+        // Check if the verifier exists
+        const verifierId = req.body.userId;
+        const verifier = usersStorage.get(verifierId).Some; // Check if verifier exists
+
+        if (!verifier) {
+            return res.status(404).send(`Verifier with id=${verifierId} not found`);
+        }
+
         const skill = user.skills.find(s => s.name === skillName);
         if (!skill) {
             return res.status(404).send(`Skill ${skillName} not found for user ${userId}`);
         }
 
-        const rating = {
-            userId: req.body.userId,
+        // Check for existing rating
+        const existingRating = skill.ratings.find(r => r.userId === verifierId);
+        if (existingRating) {
+            return res.status(400).send(`User ${verifierId} has already rated the skill ${skillName}.`);
+        }
+
+        const rating: Rating = {
+            userId: verifierId,
             score: req.body.score,
             comment: req.body.comment,
             createdAt: getCurrentDate()
