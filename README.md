@@ -1,18 +1,22 @@
 # Decentralized Skill Verification System Canister
 
-**Decentralized Skill Verification System** is a decentralized platform that allows users to claim skills, have them verified by peers, and build a decentralized reputation. This project enables users to create accounts, add skills to their profiles, and receive ratings and comments from other users to verify their skills.
+**Decentralized Skill Verification System** is a decentralized platform that allows users to add their profiles, claim skills, have them verified by peers, and build a decentralized reputation. This project enables users to create accounts, add skills to their profiles, and receive ratings and comments and ratings from others.
 
 ## Features
 
 ### User Management
 
-- **Create Users**: Users can create their profiles with a unique name.
+- **Create Users**: Users can create their profiles with a unique name and age.
 - **Retrieve User Profiles**: Fetch user profiles to view their skills and verification status.
+- **Update User Profiles**: Users can update their name and age.
+- **Delete Users**: Users can be deleted from the system.
 
 ### Skill Management
 
-- **Add Skills**: Users can add skills to their profiles.
+- **Add Skills**: Users can add multiple skills to their profiles.
 - **Verify Skills**: Other users can verify skills by providing a rating (1-5) and a comment.
+- **Remove Skills**: Users can remove specific skills from their profiles.
+- **Get All Skills**: Retrieve all skills associated with a user.
 
 ## Technology Stack
 
@@ -78,31 +82,35 @@ Once the canister is deployed, you can make API requests to interact with the sk
   **Request Body**:
   ```json
   {
-    "name": "Alice"
+    "name": "Alice",
+    "age": 30
   }
   ```
 
   **Example**
   ```bash
-  curl -X POST http://<CANISTER_ID>.localhost:8000/users -H "Content-Type: application/json" -d '{"name": "Alice"}'
+  curl -X POST http://<CANISTER_ID>.localhost:8000/users -H "Content-Type: application/json" -d '{"name": "Alice", "age": 30}'
   ```
 
-### 2. Add a Skill to a User's Profile
+### 2. Add Skill(s) to a User's Profile
 
 - **Method**: `POST`
 - **Endpoint**: `/users/:id/skills`
-- **Description**: Adds a skill to a user's profile.
+- **Description**: Adds one or multiple skills to a user's profile.
 
   **Request Body**:
   ```json
   {
-    "name": "Blockchain Development"
+    "skills": [
+      {"name": "JavaScript"},
+      {"name": "TypeScript"}
+    ]
   }
   ```
 
   **Example**
   ```bash
-  curl -X POST http://<CANISTER_ID>.localhost:8000/users/<USER_ID>/skills -H "Content-Type: application/json" -d '{"name": "Blockchain Development"}'
+  curl -X POST http://<CANISTER_ID>.localhost:8000/users/<USER_ID>/skills -H "Content-Type: application/json" -d '{"skills": [{"name": "JavaScript"}, {"name": "TypeScript"}]}'
   ```
 
 ### 3. Verify a Skill by Rating It
@@ -116,13 +124,13 @@ Once the canister is deployed, you can make API requests to interact with the sk
   {
     "userId": "<VERIFIER_USER_ID>",
     "score": 5,
-    "comment": "Excellent knowledge of blockchain!"
+    "comment": "Excellent knowledge of JavaScript!"
   }
   ```
 
   **Example**
   ```bash
-  curl -X POST http://<CANISTER_ID>.localhost:8000/users/<USER_ID>/skills/Blockchain%20Development/verify -H "Content-Type: application/json" -d '{"userId": "<VERIFIER_USER_ID>", "score": 5, "comment": "Excellent knowledge of blockchain!"}'
+  curl -X POST http://<CANISTER_ID>.localhost:8000/users/<USER_ID>/skills/JavaScript/verify -H "Content-Type: application/json" -d '{"userId": "<VERIFIER_USER_ID>", "score": 5, "comment": "Excellent knowledge of JavaScript!"}'
   ```
 
 ### 4. Retrieve a User's Profile
@@ -134,6 +142,69 @@ Once the canister is deployed, you can make API requests to interact with the sk
   **Example**
   ```bash
   curl -X GET http://<CANISTER_ID>.localhost:8000/users/<USER_ID>
+  ```
+
+### 5. Get All Users
+
+- **Method**: `GET`
+- **Endpoint**: `/users`
+- **Description**: Retrieves a list of all user profiles.
+
+  **Example**
+  ```bash
+  curl -X GET http://<CANISTER_ID>.localhost:8000/users
+  ```
+
+### 6. Delete a User by ID
+
+- **Method**: `DELETE`
+- **Endpoint**: `/users/:id`
+- **Description**: Deletes a user profile by ID.
+
+  **Example**
+  ```bash
+  curl -X DELETE http://<CANISTER_ID>.localhost:8000/users/<USER_ID>
+  ```
+
+### 7. Update User Profile
+
+- **Method**: `PUT`
+- **Endpoint**: `/users/:id`
+- **Description**: Updates a user's profile.
+
+  **Request Body**:
+  ```json
+  {
+    "name": "Alice Updated",
+    "age": 31
+  }
+  ```
+
+  **Example**
+  ```bash
+  curl -X PUT http://<CANISTER_ID>.localhost:8000/users/<USER_ID> -H "Content-Type: application/json" -d '{"name": "Alice Updated", "age": 31}'
+  ```
+
+### 8. Get All Skills for a User
+
+- **Method**: `GET`
+- **Endpoint**: `/users/:id/skills`
+- **Description**: Retrieves all skills for a specific user.
+
+  **Example**
+  ```bash
+  curl -X GET http://<CANISTER_ID>.localhost:8000/users/<USER_ID>/skills
+  ```
+
+### 9. Remove a Skill from a User's Profile
+
+- **Method**: `DELETE`
+- **Endpoint**: `/users/:id/skills/:skillName`
+- **Description**: Removes a specific skill from the user's profile.
+
+  **Example**
+  ```bash
+  curl -X DELETE http://<CANISTER_ID>.localhost:8000/users/<USER_ID>/skills/JavaScript
   ```
 
 ## Contributions

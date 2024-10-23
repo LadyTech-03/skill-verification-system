@@ -9,6 +9,7 @@ import express, { Request, Response, NextFunction } from 'express';
 class User {
     id: string;
     name: string;
+    age: number; // Added age property
     skills: Skill[];
 }
 
@@ -53,6 +54,9 @@ function validateUserInput(user: Partial<User>): string[] {
     if (!user.name || typeof user.name !== 'string') {
         errors.push('Name is required and must be a string.');
     }
+    if (user.age === undefined || typeof user.age !== 'number') {
+        errors.push('Age is required and must be a number.');
+    }
     return errors;
 }
 
@@ -91,7 +95,7 @@ app.post("/users", (req: Request, res: Response, next: NextFunction) => {
 });
 
 /**
- * Add a skill to a user's profile
+ * Add multiple skills to a user's profile
  */
 app.post("/users/:id/skills", (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -102,20 +106,26 @@ app.post("/users/:id/skills", (req: Request, res: Response, next: NextFunction) 
             return res.status(404).send(`User with id=${userId} not found`);
         }
 
-        const errors = validateSkillInput(req.body);
+        const skills: Skill[] = req.body.skills; // Expecting an array of skills
+        if (!Array.isArray(skills)) {
+            return res.status(400).json({ error: 'Skills must be an array.' });
+        }
+
+        const errors = skills.map(validateSkillInput).flat();
         if (errors.length > 0) {
             return res.status(400).json({ errors });
         }
 
-        const skill: Skill = {
-            name: req.body.name,
-            verified: false,
-            ratings: []
-        };
+        skills.forEach(skill => {
+            user.skills.push({
+                name: skill.name,
+                verified: false,
+                ratings: []
+            });
+        });
 
-        user.skills.push(skill);
         usersStorage.insert(userId, user);
-        res.status(201).json(skill);
+        res.status(201).json(user.skills);
     } catch (error) {
         next(error);
     }
@@ -166,6 +176,101 @@ app.get("/users/:id", (req: Request, res: Response) => {
         return res.status(404).send(`User with id=${userId} not found`);
     }
     res.json(user);
+});
+
+/**
+ * Get all users
+ */
+app.get("/users", (req: Request, res: Response) => {
+    const users = usersStorage.items(); // Use items() to get all users
+    res.json(users);
+});
+
+/**
+ * Delete a user by ID
+ */
+app.delete("/users/:id", (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const userId = req.params.id;
+        const user = usersStorage.get(userId).Some;
+
+        if (!user) {
+            return res.status(404).send(`User with id=${userId} not found`);
+        }
+
+        usersStorage.remove(userId); // Assuming remove() deletes the user
+        res.status(204).send(); // No content
+    } catch (error) {
+        next(error);
+    }
+});
+
+/**
+ * Update user profile
+ */
+app.put("/users/:id", (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const userId = req.params.id;
+        const user = usersStorage.get(userId).Some;
+
+        if (!user) {
+            return res.status(404).send(`User with id=${userId} not found`);
+        }
+
+        const errors = validateUserInput(req.body);
+        if (errors.length > 0) {
+            return res.status(400).json({ errors });
+        }
+
+        const updatedUser: User = {
+            ...user,
+            ...req.body
+        };
+
+        usersStorage.insert(userId, updatedUser);
+        res.status(200).json(updatedUser);
+    } catch (error) {
+        next(error);
+    }
+});
+
+/**
+ * Get all skills for a user
+ */
+app.get("/users/:id/skills", (req: Request, res: Response) => {
+    const userId = req.params.id;
+    const user = usersStorage.get(userId).Some;
+
+    if (!user) {
+        return res.status(404).send(`User with id=${userId} not found`);
+    }
+    res.json(user.skills);
+});
+
+/**
+ * Remove a skill from a user's profile
+ */
+app.delete("/users/:id/skills/:skillName", (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const userId = req.params.id;
+        const skillName = req.params.skillName;
+        const user = usersStorage.get(userId).Some;
+
+        if (!user) {
+            return res.status(404).send(`User with id=${userId} not found`);
+        }
+
+        const skillIndex = user.skills.findIndex(s => s.name === skillName);
+        if (skillIndex === -1) {
+            return res.status(404).send(`Skill ${skillName} not found for user ${userId}`);
+        }
+
+        user.skills.splice(skillIndex, 1); // Remove the skill
+        usersStorage.insert(userId, user);
+        res.status(204).send(); // No content
+    } catch (error) {
+        next(error);
+    }
 });
 
 /**
