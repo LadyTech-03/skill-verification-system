@@ -39,6 +39,8 @@ To set up and run the project locally, follow these steps:
    cd skill-verification-system
    npm install
    ```
+   _If you encounter an error when importing body and validationResult from express-validator, you can do *```npm install express-validator```*_
+
 
 3. **Start the Internet Computer locally**: Use DFX to start the local Internet Computer network:
    ```bash
