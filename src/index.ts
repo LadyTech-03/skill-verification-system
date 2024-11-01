@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Server, StableBTreeMap, ic } from 'azle';
 import express, { Request, Response, NextFunction } from 'express';
 import { body, validationResult } from 'express-validator';
+import rateLimit from 'express-rate-limit'; // Rate limiting package
 
 /**
  * `usersStorage` - a key-value data structure used to store user profiles.
@@ -31,6 +32,14 @@ const usersStorage = StableBTreeMap<string, User>(0);
 const app = express();
 app.use(express.json());
 
+// Rate limiting middleware for sensitive routes
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100 // Limit each IP to 100 requests per windowMs
+});
+
+app.use(limiter);
+
 /**
  * Error handling middleware
  */
@@ -48,40 +57,30 @@ function getCurrentDate(): Date {
 }
 
 /**
- * Validates user input data.
+ * Validates user input data using express-validator.
  */
-function validateUserInput(user: Partial<User>): string[] {
-    const errors: string[] = [];
-    if (!user.name || typeof user.name !== 'string') {
-        errors.push('Name is required and must be a string.');
-    }
-    if (user.age === undefined || typeof user.age !== 'number') {
-        errors.push('Age is required and must be a number.');
-    }
-    return errors;
-}
+const userInputValidator = [
+    body('name').isString().withMessage('Name is required and must be a string.'),
+    body('age').isInt({ min: 0 }).withMessage('Age is required and must be a positive integer.')
+];
 
 /**
- * Validates skill input data.
+ * Validates skill input data using express-validator.
  */
-function validateSkillInput(skill: Partial<Skill>): string[] {
-    const errors: string[] = [];
-    if (!skill.name || typeof skill.name !== 'string') {
-        errors.push('Skill name is required and must be a string.');
-    }
-    return errors;
-}
+const skillInputValidator = [
+    body('skills.*.name').isString().withMessage('Skill name is required and must be a string.')
+];
 
 /**
  * Create a new user
  */
-app.post("/users", (req: Request, res: Response, next: NextFunction) => {
-    try {
-        const errors = validateUserInput(req.body);
-        if (errors.length > 0) {
-            return res.status(400).json({ errors });
-        }
+app.post("/users", userInputValidator, (req: Request, res: Response, next: NextFunction) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
 
+    try {
         const user: User = {
             id: uuidv4(),
             skills: [],
@@ -98,7 +97,7 @@ app.post("/users", (req: Request, res: Response, next: NextFunction) => {
 /**
  * Add multiple skills to a user's profile
  */
-app.post("/users/:id/skills", (req: Request, res: Response, next: NextFunction) => {
+app.post("/users/:id/skills", skillInputValidator, (req: Request, res: Response, next: NextFunction) => {
     try {
         const userId = req.params.id;
         const user = usersStorage.get(userId).Some;
@@ -112,9 +111,9 @@ app.post("/users/:id/skills", (req: Request, res: Response, next: NextFunction) 
             return res.status(400).json({ error: 'Skills must be an array.' });
         }
 
-        const errors = skills.map(validateSkillInput).flat();
-        if (errors.length > 0) {
-            return res.status(400).json({ errors });
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
         }
 
         skills.forEach(skill => {
@@ -133,7 +132,7 @@ app.post("/users/:id/skills", (req: Request, res: Response, next: NextFunction) 
 });
 
 /**
- * Middleware for validating rating input
+ * Middleware for validating rating input using express-validator
  */
 const validateRatingInput = [
     body('userId').isString().withMessage('User ID is required and must be a string.'),
@@ -218,6 +217,7 @@ app.get("/users", (req: Request, res: Response) => {
 /**
  * Delete a user by ID
  */
+
 app.delete("/users/:id", (req: Request, res: Response, next: NextFunction) => {
     try {
         const userId = req.params.id;
@@ -237,18 +237,19 @@ app.delete("/users/:id", (req: Request, res: Response, next: NextFunction) => {
 /**
  * Update user profile
  */
-app.put("/users/:id", (req: Request, res: Response, next: NextFunction) => {
+
+app.put("/users/:id", userInputValidator, (req: Request, res: Response, next: NextFunction) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
     try {
         const userId = req.params.id;
         const user = usersStorage.get(userId).Some;
 
         if (!user) {
             return res.status(404).send(`User with id=${userId} not found`);
-        }
-
-        const errors = validateUserInput(req.body);
-        if (errors.length > 0) {
-            return res.status(400).json({ errors });
         }
 
         const updatedUser: User = {
@@ -294,19 +295,4 @@ app.delete("/users/:id/skills/:skillName", (req: Request, res: Response, next: N
             return res.status(404).send(`Skill ${skillName} not found for user ${userId}`);
         }
 
-        user.skills.splice(skillIndex, 1); // Remove the skill
-        usersStorage.insert(userId, user);
-        res.status(204).send(); // No content
-    } catch (error) {
-        next(error);
-    }
-});
-
-/**
- * Start the server and handle any startup errors
- */
-export default Server(() => {
-    return app.listen(3000, () => {
-        console.log('Skill Verification Server started on port 3000');
-    });
-});
+        user.skills
