@@ -295,4 +295,13 @@ app.delete("/users/:id/skills/:skillName", (req: Request, res: Response, next: N
             return res.status(404).send(`Skill ${skillName} not found for user ${userId}`);
         }
 
-        user.skills
+        // Remove the skill from the array
+        user.skills.splice(skillIndex, 1);
+        
+        // Update the user in storage
+        usersStorage.insert(userId, user);
+        res.status(204).send();
+    } catch (error) {
+        next(error);
+    }
+});
